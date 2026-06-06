@@ -56,7 +56,6 @@ export default function AppShell() {
   )
   const panelClientDetail = clientId
     ? <ClientDetail tenantId={tenant.id} clientId={clientId}
-        selectedLoanId={loanId}
         onSelectLoan={lid => goTo('loan-detail', clientId, lid)} />
     : <EmptyPanel icon="👆" message="Select a client to view details" />
 
