@@ -8,7 +8,6 @@ import config from '@/lib/config'
 
 export default function SettingsPanel({ tenant }: { tenant: Tenant }) {
   const [bizName,   setBizName]   = useState(tenant.businessName)
-  const [upiId,     setUpiId]     = useState(tenant.upiId || '')
   const [rate,      setRate]      = useState(String(tenant.defaultRate || 1.5))
   const [logoUrl,   setLogoUrl]   = useState(tenant.logoUrl || '')
   const [saving,    setSaving]    = useState(false)
@@ -16,13 +15,10 @@ export default function SettingsPanel({ tenant }: { tenant: Tenant }) {
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  // Derive plan state — all from helpers, no logic here
-  const proActive = isProActive(tenant)
+  const proActive  = isProActive(tenant)
   const nearExpiry = isNearExpiry(tenant)
   const expired    = isExpired(tenant)
   const daysLeft   = daysUntilExpiry(tenant)
-
-  // Price always from config — never hardcoded here
   const price      = config.currentPriceINR
   const priceStr   = `₹${price.toLocaleString('en-IN')}`
 
@@ -33,7 +29,6 @@ export default function SettingsPanel({ tenant }: { tenant: Tenant }) {
     setSaving(true)
     await updateTenant(tenant.id, {
       businessName: bizName.trim(),
-      upiId:        upiId.trim(),
       defaultRate:  parseFloat(rate) || 1.5,
     } as Partial<Tenant>)
     setSaving(false); setSaved(true)
@@ -55,9 +50,8 @@ export default function SettingsPanel({ tenant }: { tenant: Tenant }) {
   return (
     <div className="max-w-lg mx-auto p-4 space-y-3 pb-10">
 
-      {/* ── PLAN STATUS CARD ─────────────────────────────────── */}
+      {/* ── PLAN STATUS ── */}
       {proActive && !nearExpiry && !expired ? (
-        /* Active Pro — no paywall, clean status only */
         <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-center justify-between">
           <div>
             <div className="font-bold text-yellow-900">⭐ Pro Plan Active</div>
@@ -66,7 +60,10 @@ export default function SettingsPanel({ tenant }: { tenant: Tenant }) {
             </div>
             {tenant.proExpiresAt && (
               <div className="text-yellow-600 text-xs mt-1">
-                Valid until {new Date(tenant.proExpiresAt).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })}
+                Valid until{' '}
+                {new Date(tenant.proExpiresAt).toLocaleDateString('en-IN', {
+                  day: '2-digit', month: 'short', year: 'numeric'
+                })}
               </div>
             )}
           </div>
@@ -74,7 +71,6 @@ export default function SettingsPanel({ tenant }: { tenant: Tenant }) {
         </div>
 
       ) : nearExpiry ? (
-        /* Expiring within renewalReminderDays — amber reminder */
         <div className="bg-amber-50 border border-amber-300 rounded-xl p-4">
           <div className="flex items-start gap-3 mb-3">
             <AlertTriangle size={20} className="text-amber-600 flex-shrink-0 mt-0.5"/>
@@ -84,7 +80,9 @@ export default function SettingsPanel({ tenant }: { tenant: Tenant }) {
               </div>
               <div className="text-amber-700 text-sm mt-0.5">
                 Renew before{' '}
-                {new Date(tenant.proExpiresAt!).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })}{' '}
+                {new Date(tenant.proExpiresAt!).toLocaleDateString('en-IN', {
+                  day: '2-digit', month: 'short', year: 'numeric'
+                })}{' '}
                 to keep all Pro features.
               </div>
             </div>
@@ -93,15 +91,15 @@ export default function SettingsPanel({ tenant }: { tenant: Tenant }) {
         </div>
 
       ) : expired ? (
-        /* Expired — red card + upgrade */
         <div className="bg-red-50 border border-red-200 rounded-xl p-5">
           <div className="font-bold text-red-800 mb-1">⚠ Pro Plan Expired</div>
-          <div className="text-red-600 text-sm mb-4">Your Pro licence has expired. Renew to restore all features.</div>
+          <div className="text-red-600 text-sm mb-4">
+            Your Pro licence has expired. Renew to restore all features.
+          </div>
           <UpgradeCard upgradeUPI={upgradeUPI} upgradeWA={upgradeWA} priceStr={priceStr} tenant={tenant}/>
         </div>
 
       ) : (
-        /* Free plan — full upgrade card */
         <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-xl p-5">
           <div className="flex items-start justify-between mb-3">
             <div>
@@ -114,56 +112,56 @@ export default function SettingsPanel({ tenant }: { tenant: Tenant }) {
         </div>
       )}
 
-      {/* ── BRANDING & SETTINGS ─────────────────────────────── */}
+      {/* ── BRANDING & SETTINGS ── */}
       <div className="bg-white rounded-xl p-5 shadow-sm">
         <div className="text-sm font-bold text-gray-700 mb-4">Branding &amp; Settings</div>
 
         {/* Logo */}
         <div className="mb-5">
-          <label className="block text-xs font-semibold text-blue-600 uppercase tracking-wide mb-2">Business Logo</label>
+          <label className="block text-xs font-semibold text-blue-600 uppercase tracking-wide mb-2">
+            Business Logo
+          </label>
           <div className="flex items-center gap-4">
             {logoUrl
               ? <img src={logoUrl} alt="logo" className="w-14 h-14 rounded-lg object-contain border border-gray-100"/>
-              : <div className="w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400 text-xs">No Logo</div>
+              : <div className="w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400 text-xs">
+                  No Logo
+                </div>
             }
             <button onClick={() => fileRef.current?.click()} disabled={uploading}
               className="flex items-center gap-2 text-sm text-blue-600 border border-blue-200 rounded-lg px-3 py-2 hover:bg-blue-50 disabled:opacity-50">
               <Upload size={15}/>{uploading ? 'Uploading…' : 'Upload PNG'}
             </button>
-            <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleLogo}/>
+            <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp"
+              className="hidden" onChange={handleLogo}/>
           </div>
           <p className="text-xs text-gray-400 mt-1">PNG, JPG or WebP · max 2MB · shown in your app header</p>
         </div>
 
         {/* Business name */}
         <div className="mb-4">
-          <label className="block text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">Business Name</label>
+          <label className="block text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">
+            Business Name
+          </label>
           <input value={bizName} onChange={e => setBizName(e.target.value)}
             className="w-full border-b border-gray-300 focus:border-blue-600 outline-none py-2 text-sm text-gray-800 bg-transparent"/>
           <p className="text-xs text-gray-400 mt-1">Displayed at the top of your app</p>
         </div>
 
         {/* Default interest rate */}
-        <div className="mb-4">
-          <label className="block text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">Default Annual Interest Rate</label>
+        <div className="mb-5">
+          <label className="block text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">
+            Default Annual Interest Rate
+          </label>
           <div className="flex items-center gap-2">
             <input type="number" step="0.1" min="0.1" max="100"
               value={rate} onChange={e => setRate(e.target.value)}
               className="w-24 border-b border-gray-300 focus:border-blue-600 outline-none py-2 text-sm text-gray-800 bg-transparent font-mono"/>
             <span className="text-sm text-gray-400">% per annum</span>
           </div>
-          <p className="text-xs text-gray-400 mt-1">Pre-filled when creating a new loan. Can be changed per loan.</p>
-        </div>
-
-        {/* Lender's own UPI — for their borrowers to pay them */}
-        <div className="mb-5">
-          <label className="block text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">
-            Your UPI ID
-            <span className="text-gray-400 normal-case font-normal ml-1">(borrowers use this to repay you)</span>
-          </label>
-          <input value={upiId} onChange={e => setUpiId(e.target.value)} placeholder="e.g. yourname@paytm"
-            className="w-full border-b border-gray-300 focus:border-blue-600 outline-none py-2 text-sm text-gray-800 bg-transparent"/>
-          <p className="text-xs text-gray-400 mt-1">Shown on loan pages so borrowers can pay you directly.</p>
+          <p className="text-xs text-gray-400 mt-1">
+            Pre-filled when creating a new loan. Can be changed per loan.
+          </p>
         </div>
 
         <button onClick={handleSave} disabled={saving}
@@ -172,7 +170,7 @@ export default function SettingsPanel({ tenant }: { tenant: Tenant }) {
         </button>
       </div>
 
-      {/* ── CONTACT & SUPPORT ────────────────────────────────── */}
+      {/* ── CONTACT & SUPPORT ── */}
       <div className="bg-white rounded-xl p-5 shadow-sm">
         <div className="text-sm font-bold text-gray-700 mb-3">Contact &amp; Support</div>
         <div className="space-y-3">
@@ -197,13 +195,14 @@ export default function SettingsPanel({ tenant }: { tenant: Tenant }) {
             </div>
           </a>
         </div>
-        <p className="text-xs text-gray-400 mt-3 text-center">{config.appName} v1.0 · Built for Indian lenders</p>
+        <p className="text-xs text-gray-400 mt-3 text-center">
+          {config.appName} v1.0 · Built for Indian lenders
+        </p>
       </div>
+
     </div>
   )
 }
-
-// ── Shared sub-components ─────────────────────────────────────
 
 function UpgradeButtons({ upgradeUPI, upgradeWA, priceStr, label = 'Upgrade' }: {
   upgradeUPI: string; upgradeWA: string; priceStr: string; label?: string

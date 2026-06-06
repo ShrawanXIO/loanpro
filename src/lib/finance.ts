@@ -26,65 +26,109 @@ export function addDaysToDate(dateStr: string, n: number): string {
   return d.toISOString().slice(0, 10)
 }
 
-export function outstandingPrincipal(principal: number, payments: { amount: number }[]): number {
+export function outstandingPrincipal(
+  principal: number,
+  payments: { amount: number }[]
+): number {
   let rem = principal
   for (const p of payments) { if (rem <= 0) break; rem -= p.amount }
   return Math.max(0, rem)
 }
 
+// ── OVERDUE INTEREST ──────────────────────────────────────────
+// After due date: SI accrues daily on outstanding principal
+// at the same annual rate — principal-first payment order.
+
 export function calcOverdueSI(
-  principal: number, rate: number,
-  loanDate: string, termDays: number,
-  payments: { amount: number; date: string }[],
-  toDate?: string
+  principal:  number,
+  rate:       number,
+  loanDate:   string,
+  termDays:   number,
+  payments:   { amount: number; date: string }[],
+  toDate?:    string
 ): number {
   const od = overdueDays(loanDate, termDays, toDate)
   if (od <= 0) return 0
-  const sorted = [...payments].sort((a,b) => a.date < b.date ? -1 : 1)
+  const sorted      = [...payments].sort((a,b) => a.date < b.date ? -1 : 1)
   const outstanding = outstandingPrincipal(principal, sorted)
   if (outstanding <= 0) return 0
   return calcSI(outstanding, rate, od)
 }
 
 export interface LoanSnapshot {
-  originalSI: number
-  overdueSI: number
-  totalDue: number
-  totalPaid: number
-  pending: number
-  overdueDays: number
-  elapsed: number
-  dueDate: string
-  isOverdue: boolean
-  isClosed: boolean
+  originalSI:           number
+  overdueSI:            number
+  totalDue:             number
+  totalPaid:            number
+  pending:              number
+  overdueDays:          number
+  elapsed:              number
+  dueDate:              string
+  isOverdue:            boolean
+  isClosed:             boolean
   outstandingPrincipal: number
-  amountPaidPct: number
-  daysPct: number
+  amountPaidPct:        number
+  daysPct:              number
+}
+
+// Loan and Payment types (used in LoanDetail)
+export interface Loan {
+  id:        string
+  tenantId:  string
+  clientId:  string
+  principal: number
+  rate:      number
+  days:      number
+  date:      string
+  closed:    boolean
+}
+
+export interface Payment {
+  id:       string
+  tenantId: string
+  loanId:   string
+  amount:   number
+  mode:     string
+  date:     string
 }
 
 export function loanSnapshot(
-  loan: { principal: number; rate: number; days: number; date: string },
+  loan:     { principal: number; rate: number; days: number; date: string },
   payments: { amount: number; date: string }[],
-  toDate?: string
+  toDate?:  string
 ): LoanSnapshot {
-  const sorted     = [...payments].sort((a,b) => a.date < b.date ? -1 : 1)
-  const originalSI = calcSI(loan.principal, loan.rate, loan.days)
-  const overdueSI  = calcOverdueSI(loan.principal, loan.rate, loan.date, loan.days, sorted, toDate)
-  const totalDue   = loan.principal + originalSI + overdueSI
-  const totalPaid  = sorted.reduce((s,p) => s + p.amount, 0)
-  const pending    = Math.max(0, totalDue - totalPaid)
-  const od         = overdueDays(loan.date, loan.days, toDate)
-  const elapsed    = daysElapsed(loan.date, toDate)
-  const dueDate    = addDaysToDate(loan.date, loan.days)
+  const sorted      = [...payments].sort((a,b) => a.date < b.date ? -1 : 1)
+  const originalSI  = calcSI(loan.principal, loan.rate, loan.days)
+
+  // Overdue SI: accrues on outstanding principal after due date
+  const overdueSI   = calcOverdueSI(
+    loan.principal, loan.rate, loan.date, loan.days, sorted, toDate
+  )
+
+  const totalDue    = loan.principal + originalSI + overdueSI
+  const totalPaid   = sorted.reduce((s,p) => s + p.amount, 0)
+  const pending     = Math.max(0, totalDue - totalPaid)
+  const od          = overdueDays(loan.date, loan.days, toDate)
+  const elapsed     = daysElapsed(loan.date, toDate)
+  const dueDate     = addDaysToDate(loan.date, loan.days)
   const outstanding = outstandingPrincipal(loan.principal, sorted)
+
   return {
-    originalSI, overdueSI, totalDue, totalPaid, pending,
-    overdueDays: od, elapsed, dueDate,
-    isOverdue:   od > 0 && pending > 0,
-    isClosed:    pending <= 0,
+    originalSI,
+    overdueSI,
+    totalDue,
+    totalPaid,
+    pending,
+    overdueDays:          od,
+    elapsed,
+    dueDate,
+    isOverdue:            od > 0 && pending > 0,
+    isClosed:             pending <= 0,
     outstandingPrincipal: outstanding,
-    amountPaidPct: totalDue > 0 ? Math.min(100, Math.round(totalPaid / totalDue * 100)) : 0,
-    daysPct:       Math.min(100, Math.round(elapsed / loan.days * 100)),
+    amountPaidPct: totalDue > 0
+      ? Math.min(100, Math.round(totalPaid / totalDue * 100))
+      : 0,
+    daysPct: Math.min(100, Math.round(elapsed / loan.days * 100)),
   }
 }
 
@@ -94,7 +138,9 @@ export function fmtINR(n: number): string {
 
 export function fmtDate(d: string): string {
   if (!d) return '—'
-  return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })
+  return new Date(d).toLocaleDateString('en-IN', {
+    day: '2-digit', month: 'short', year: '2-digit'
+  })
 }
 
 export function todayStr(): string {

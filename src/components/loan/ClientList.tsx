@@ -50,7 +50,7 @@ export default function ClientList({ tenant, isPaid, selectedClientId, onSelectC
       setShowAdd(false); setNewName(''); setNewPhone('')
     } catch (e: unknown) {
       setErr(e instanceof Error && e.message === 'FREE_LIMIT'
-        ? `Free plan limit (${tenant.clientLimit} clients) reached. Upgrade to Pro for ₹${config.proPriceINR.toLocaleString('en-IN')}/year.`
+        ? `Free plan limit (${tenant.clientLimit} clients) reached. Upgrade to Pro for ₹${config.currentPriceINR.toLocaleString('en-IN')}/year.`
         : e instanceof Error && e.message === 'PAID_LIMIT'
         ? `Pro plan limit (${tenant.clientLimit} clients) reached. Contact us to increase.`
         : 'Something went wrong. Try again.')
@@ -60,7 +60,7 @@ export default function ClientList({ tenant, isPaid, selectedClientId, onSelectC
 
   // Use tenant.clientLimit — set in Firestore, no hardcoded values
   const atLimit    = tenant.clientCount >= tenant.clientLimit
-  const upgradeUPI = `upi://pay?pa=${encodeURIComponent(config.ownerUpi)}&pn=${encodeURIComponent(config.appName)}&am=${config.proPriceINR}&cu=INR&tn=${encodeURIComponent(config.appName + ' Pro - ' + tenant.businessName)}`
+  const upgradeUPI = `upi://pay?pa=${encodeURIComponent(config.ownerUpi)}&pn=${encodeURIComponent(config.appName)}&am=${config.currentPriceINR}&cu=INR&tn=${encodeURIComponent(config.appName + ' Pro - ' + tenant.businessName)}`
   const upgradeWA  = `https://wa.me/${config.ownerWhatsApp}?text=${encodeURIComponent(`Hi, I want to upgrade ${config.appName} Pro.\nBusiness: ${tenant.businessName}`)}`
 
   return (
@@ -69,7 +69,7 @@ export default function ClientList({ tenant, isPaid, selectedClientId, onSelectC
       {/* Upgrade banner — free users only */}
       {!isPaid && (
         <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl p-4 mb-3">
-          <div className="font-bold text-sm mb-0.5">Upgrade to Pro — ₹{config.proPriceINR.toLocaleString('en-IN')}/year</div>
+          <div className="font-bold text-sm mb-0.5">Upgrade to Pro — ₹{config.currentPriceINR.toLocaleString('en-IN')}/year</div>
           <div className="text-blue-100 text-xs mb-3">
             {tenant.clientCount}/{tenant.clientLimit} clients used · Unlock {config.paidTierLimit} clients + Dashboard + Share reports
           </div>
