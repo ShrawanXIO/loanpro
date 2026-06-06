@@ -7,6 +7,7 @@ import { loanSnapshot, fmtINR, fmtDate, toDays, calcSI } from '@/lib/finance'
 interface Props {
   tenantId: string
   clientId: string
+  selectedLoanId?: string
   onSelectLoan: (loanId: string) => void
 }
 
