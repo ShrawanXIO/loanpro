@@ -5,7 +5,11 @@ export const metadata: Metadata = {
   title: 'LoanPro',
   description: 'Simple loan management for lenders',
   manifest: '/manifest.json',
-  appleWebApp: { capable: true, statusBarStyle: 'default', title: 'LoanPro' },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'LoanPro',
+  },
 }
 
 export const viewport: Viewport = {
@@ -21,8 +25,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Mono:wght@400;500&display=swap"
+          rel="stylesheet"
+        />
         <link rel="apple-touch-icon" href="/icon-192.png" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
       </head>
       <body className="font-sans bg-gray-100 min-h-screen">{children}</body>
     </html>
