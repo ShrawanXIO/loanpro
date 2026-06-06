@@ -1,24 +1,27 @@
 // src/lib/config.ts
-// ─────────────────────────────────────────────
-// Change these values ONCE here.
-// They are used everywhere in the app automatically.
-// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// Edit ONCE here. Used everywhere automatically.
+// ─────────────────────────────────────────────────────────────
 
 const config = {
-  // Your WhatsApp number (country code + 10 digits, no spaces or +)
-  ownerWhatsApp: '919999999999',
+  // ── App owner contact (you — the person selling LoanPro) ──
+  ownerWhatsApp: '919999999999',        // 91 + your 10-digit number
+  ownerEmail:    'support@loanpro.in',  // your support email
+  ownerUpi:      'yourname@upi',        // YOUR UPI ID — lenders pay you here
 
-  // Your email for support
-  ownerEmail: 'support@loanpro.in',
-
-  // YOUR UPI ID — this is where lenders send ₹5,000 to upgrade
-  ownerUpi: '8801080101@upi',
-
-  // App name shown in payment notes
+  // ── App info ──────────────────────────────────────────────
   appName: 'LoanPro',
 
-  // Pro plan price in INR
-  proPriceINR: 6000,
+  // ── Pricing (change here, updates everywhere) ─────────────
+  // Current asking price shown to users on all upgrade buttons
+  currentPriceINR: 5000,
+
+  // ── Tier limits (fallback if not set on tenant) ───────────
+  freeTierLimit: 10,
+  paidTierLimit: 100,
+
+  // ── Renewal reminder window (days before expiry) ──────────
+  renewalReminderDays: 15,
 }
 
 export default config

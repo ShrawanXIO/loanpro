@@ -5,10 +5,10 @@ import { getClients, addClientFS, Client, Tenant } from '@/lib/firestore'
 import config from '@/lib/config'
 
 interface Props {
-  tenant: Tenant
-  isPaid: boolean
+  tenant:           Tenant
+  isPaid:           boolean
   selectedClientId?: string
-  onSelectClient: (id: string) => void
+  onSelectClient:   (id: string) => void
 }
 
 function avatarColor(name: string) {
@@ -44,18 +44,22 @@ export default function ClientList({ tenant, isPaid, selectedClientId, onSelectC
     if (clients.find(c => c.phone === newPhone.trim())) { setErr('Phone number already registered'); return }
     setSaving(true); setErr('')
     try {
-      const c = await addClientFS(tenant.id, newName, newPhone, tenant.tier, tenant.clientCount)
+      // Pass full tenant object — addClientFS reads clientLimit from it
+      const c = await addClientFS(tenant.id, newName, newPhone, tenant)
       setClients(prev => [...prev, c].sort((a,b) => a.name.localeCompare(b.name)))
       setShowAdd(false); setNewName(''); setNewPhone('')
     } catch (e: unknown) {
       setErr(e instanceof Error && e.message === 'FREE_LIMIT'
-        ? `Free plan limit (10 clients) reached. Upgrade to Pro for ₹${config.proPriceINR.toLocaleString('en-IN')}/year.`
+        ? `Free plan limit (${tenant.clientLimit} clients) reached. Upgrade to Pro for ₹${config.proPriceINR.toLocaleString('en-IN')}/year.`
+        : e instanceof Error && e.message === 'PAID_LIMIT'
+        ? `Pro plan limit (${tenant.clientLimit} clients) reached. Contact us to increase.`
         : 'Something went wrong. Try again.')
     }
     setSaving(false)
   }
 
-  const atLimit    = tenant.clientCount >= (isPaid ? 100 : 10)
+  // Use tenant.clientLimit — set in Firestore, no hardcoded values
+  const atLimit    = tenant.clientCount >= tenant.clientLimit
   const upgradeUPI = `upi://pay?pa=${encodeURIComponent(config.ownerUpi)}&pn=${encodeURIComponent(config.appName)}&am=${config.proPriceINR}&cu=INR&tn=${encodeURIComponent(config.appName + ' Pro - ' + tenant.businessName)}`
   const upgradeWA  = `https://wa.me/${config.ownerWhatsApp}?text=${encodeURIComponent(`Hi, I want to upgrade ${config.appName} Pro.\nBusiness: ${tenant.businessName}`)}`
 
@@ -67,7 +71,7 @@ export default function ClientList({ tenant, isPaid, selectedClientId, onSelectC
         <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl p-4 mb-3">
           <div className="font-bold text-sm mb-0.5">Upgrade to Pro — ₹{config.proPriceINR.toLocaleString('en-IN')}/year</div>
           <div className="text-blue-100 text-xs mb-3">
-            {tenant.clientCount}/10 clients used · Unlock 100 clients + Dashboard + Share reports
+            {tenant.clientCount}/{tenant.clientLimit} clients used · Unlock {config.paidTierLimit} clients + Dashboard + Share reports
           </div>
           <div className="flex gap-2">
             <a href={upgradeUPI}
@@ -95,8 +99,7 @@ export default function ClientList({ tenant, isPaid, selectedClientId, onSelectC
       <div className="bg-white rounded-lg overflow-hidden mb-3 shadow-sm">
         {loading ? (
           <div className="flex items-center justify-center gap-2 p-8 text-gray-400 text-sm">
-            <div className="w-4 h-4 border-2 border-gray-200 border-t-blue-600 rounded-full spinner"/>
-            Loading…
+            <div className="w-4 h-4 border-2 border-gray-200 border-t-blue-600 rounded-full spinner"/>Loading…
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center p-8 text-gray-400 text-sm">
@@ -165,7 +168,7 @@ export default function ClientList({ tenant, isPaid, selectedClientId, onSelectC
 
       {atLimit && !showAdd && (
         <p className="text-center text-xs text-gray-400 mt-2">
-          {isPaid ? 'Pro limit (100 clients) reached.' : 'Free limit reached. '}
+          {isPaid ? `Pro limit (${tenant.clientLimit} clients) reached. ` : 'Free limit reached. '}
           {!isPaid && <a href={upgradeWA} target="_blank" rel="noreferrer" className="text-blue-600 underline">WhatsApp us to upgrade →</a>}
         </p>
       )}
