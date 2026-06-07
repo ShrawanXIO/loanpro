@@ -242,13 +242,15 @@ export async function getLoans(tenantId: string, clientId: string) {
   return snap.docs
     .map(d => {
       const data = d.data() as Record<string, unknown>
+      const legacyDays = Number(data.days || 0)
+      const months = data.months !== undefined ? Number(data.months) : Math.round(legacyDays / 30)
       return {
         id:        d.id,
         tenantId:  String(data.tenantId  || ''),
         clientId:  String(data.clientId  || ''),
         principal: Number(data.principal || 0),
         rate:      Number(data.rate      || 0),
-        days:      Number(data.days      || 0),
+        months,
         date:      tsToStr(data.date),
         closed:    Boolean(data.closed),
       }
@@ -258,11 +260,11 @@ export async function getLoans(tenantId: string, clientId: string) {
 
 export async function addLoan(
   tenantId: string, clientId: string,
-  principal: number, rate: number, days: number,
+  principal: number, rate: number, months: number,
 ) {
-  const data = { tenantId, clientId, principal, rate, days, date: serverTimestamp(), closed: false }
+  const data = { tenantId, clientId, principal, rate, months, date: serverTimestamp(), closed: false }
   const ref  = await addDoc(collection(db, 'loans'), data)
-  return { id: ref.id, tenantId, clientId, principal, rate, days, date: todayStr(), closed: false }
+  return { id: ref.id, tenantId, clientId, principal, rate, months, date: todayStr(), closed: false }
 }
 
 export async function closeLoan(loanId: string): Promise<void> {
@@ -313,7 +315,12 @@ export async function getDashboardData(tenantId: string) {
   const toDate = (d: Record<string,unknown>) => ({ ...d, date: tsToStr(d.date) })
   return {
     clients:  clientsSnap.docs.map(d  => ({ id: d.id, ...d.data() })),
-    loans:    loansSnap.docs.map(d    => ({ id: d.id, ...toDate(d.data() as Record<string,unknown>) })),
+    loans:    loansSnap.docs.map(d    => {
+      const data = d.data() as Record<string,unknown>
+      const legacyDays = Number(data.days || 0)
+      const months = data.months !== undefined ? Number(data.months) : Math.round(legacyDays / 30)
+      return { id: d.id, ...toDate(data), months }
+    }),
     payments: paymentsSnap.docs.map(d => ({ id: d.id, ...toDate(d.data() as Record<string,unknown>) })),
   }
 }
