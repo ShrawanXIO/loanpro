@@ -29,7 +29,6 @@ export default function ClientDetail({ tenantId, clientId, onSelectLoan }: Props
       getLoans(tenantId, clientId),
     ])
     
-    // Fetch payments for all of this client's loans
     const paysArrays = await Promise.all(allLoans.map(l => getPayments(tenantId, l.id)))
     const allPays = paysArrays.flat()
 
@@ -39,9 +38,16 @@ export default function ClientDetail({ tenantId, clientId, onSelectLoan }: Props
     setLoading(false)
   }, [tenantId, clientId])
 
-  useEffect(() => { load() }, [load])
+  // Initial load and event listener setup
+  useEffect(() => { 
+    load() 
+    
+    // Listen for updates from LoanDetail
+    const handleUpdate = () => load()
+    window.addEventListener('loan-updated', handleUpdate)
+    return () => window.removeEventListener('loan-updated', handleUpdate)
+  }, [load])
 
-  // Stats calculation
   const stats = loans.reduce((acc, loan) => {
     const loanPays = payments.filter(p => p.loanId === loan.id)
     const snap = loanSnapshot(loan, loanPays)
@@ -63,6 +69,7 @@ export default function ClientDetail({ tenantId, clientId, onSelectLoan }: Props
       setShowAdd(false)
       setForm({ principal:'', rate:'1.5', periodVal:'', periodUnit:'months' })
       await load()
+      window.dispatchEvent(new Event('loan-updated')) // Notify Dashboard as well
     } catch { setErr('Failed to add loan. Try again.') }
     setSaving(false)
   }
@@ -79,11 +86,9 @@ export default function ClientDetail({ tenantId, clientId, onSelectLoan }: Props
     </div>
   )
 
-  // Pre-process loans to guarantee stable chronological IDs and evaluate their status
   const processedLoans = loans.map((loan, index) => {
     const loanPays = payments.filter(p => p.loanId === loan.id)
     const snap = loanSnapshot(loan, loanPays)
-    // loans array is newest-to-oldest, so reverse the index to get chronological order
     const displayId = `L-${String(loans.length - index).padStart(2, '0')}`
     return { loan, snap, displayId }
   })
@@ -93,7 +98,6 @@ export default function ClientDetail({ tenantId, clientId, onSelectLoan }: Props
 
   return (
     <div className="max-w-lg mx-auto p-4">
-      {/* Client info */}
       {client && (
         <div className="bg-white rounded-lg elev-1 overflow-hidden mb-3">
           <div className="bg-gray-800 text-white p-4 flex items-center gap-4">
@@ -121,14 +125,12 @@ export default function ClientDetail({ tenantId, clientId, onSelectLoan }: Props
         </div>
       )}
 
-      {/* Loans Container */}
       {loans.length === 0 ? (
         <div className="bg-white rounded-lg elev-1 overflow-hidden mb-3">
           <div className="text-center p-8 text-gray-400 text-sm">No loans yet</div>
         </div>
       ) : (
         <>
-          {/* Active Loans Section */}
           {activeLoans.length > 0 && (
             <>
               <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-1 mb-2">Active Loans</div>
@@ -155,12 +157,11 @@ export default function ClientDetail({ tenantId, clientId, onSelectLoan }: Props
             </>
           )}
 
-          {/* Completed Loans Section */}
           {completedLoans.length > 0 && (
             <>
               <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-1 mb-2 mt-2">Completed Loans</div>
               <div className="bg-white rounded-lg elev-1 overflow-hidden mb-3">
-                {completedLoans.map(({ loan, snap, displayId }) => (
+                {completedLoans.map(({ loan, displayId }) => (
                   <button key={loan.id} onClick={() => onSelectLoan(loan.id)}
                     className="w-full flex items-center gap-3 px-4 py-3.5 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors text-left opacity-80">
                     <span className="text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 bg-gray-100 text-gray-400">{displayId}</span>
@@ -181,7 +182,6 @@ export default function ClientDetail({ tenantId, clientId, onSelectLoan }: Props
         </>
       )}
 
-      {/* Add loan */}
       {!showAdd ? (
         <button onClick={() => setShowAdd(true)}
           className="w-full py-3 rounded-lg bg-primary-600 text-white font-medium text-sm flex items-center justify-center gap-2 hover:bg-primary-700 transition-colors">
@@ -242,10 +242,8 @@ export default function ClientDetail({ tenantId, clientId, onSelectLoan }: Props
 
           {err && <p className="text-red-600 text-xs mb-3">{err}</p>}
           <div className="flex gap-3">
-            <button onClick={() => { setShowAdd(false); setErr('') }}
-              className="flex-1 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50">Cancel</button>
-            <button onClick={handleAddLoan} disabled={saving}
-              className="flex-1 py-2 rounded-lg bg-primary-600 text-white text-sm font-semibold hover:bg-primary-700 disabled:opacity-50">
+            <button onClick={() => { setShowAdd(false); setErr('') }} className="flex-1 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50">Cancel</button>
+            <button onClick={handleAddLoan} disabled={saving} className="flex-1 py-2 rounded-lg bg-primary-600 text-white text-sm font-semibold hover:bg-primary-700 disabled:opacity-50">
               {saving ? 'Saving…' : 'Confirm Loan'}
             </button>
           </div>
