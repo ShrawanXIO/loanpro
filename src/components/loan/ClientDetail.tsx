@@ -41,7 +41,7 @@ export default function ClientDetail({ tenantId, clientId, onSelectLoan }: Props
 
   useEffect(() => { load() }, [load])
 
-  // Stats calculation (now correctly using payments to determine pending and closed status)
+  // Stats calculation
   const stats = loans.reduce((acc, loan) => {
     const loanPays = payments.filter(p => p.loanId === loan.id)
     const snap = loanSnapshot(loan, loanPays)
@@ -79,6 +79,18 @@ export default function ClientDetail({ tenantId, clientId, onSelectLoan }: Props
     </div>
   )
 
+  // Pre-process loans to guarantee stable chronological IDs and evaluate their status
+  const processedLoans = loans.map((loan, index) => {
+    const loanPays = payments.filter(p => p.loanId === loan.id)
+    const snap = loanSnapshot(loan, loanPays)
+    // loans array is newest-to-oldest, so reverse the index to get chronological order
+    const displayId = `L-${String(loans.length - index).padStart(2, '0')}`
+    return { loan, snap, displayId }
+  })
+
+  const activeLoans = processedLoans.filter(l => !l.snap.isClosed)
+  const completedLoans = processedLoans.filter(l => l.snap.isClosed)
+
   return (
     <div className="max-w-lg mx-auto p-4">
       {/* Client info */}
@@ -109,40 +121,65 @@ export default function ClientDetail({ tenantId, clientId, onSelectLoan }: Props
         </div>
       )}
 
-      {/* Loans */}
-      <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-1 mb-2">Loans</div>
-      <div className="bg-white rounded-lg elev-1 overflow-hidden mb-3">
-        {loans.length === 0 ? (
+      {/* Loans Container */}
+      {loans.length === 0 ? (
+        <div className="bg-white rounded-lg elev-1 overflow-hidden mb-3">
           <div className="text-center p-8 text-gray-400 text-sm">No loans yet</div>
-        ) : (
-          loans.map((loan, i) => {
-            const loanPays = payments.filter(p => p.loanId === loan.id)
-            const snap = loanSnapshot(loan, loanPays)
-            const chipCls = snap.isClosed ? 'bg-gray-100 text-gray-400' : snap.isOverdue ? 'bg-red-100 text-red-700' : 'bg-blue-50 text-primary-600'
-            const chipLabel = snap.isClosed ? 'Closed' : snap.isOverdue ? 'Overdue' : 'Active'
-            return (
-              <button key={loan.id} onClick={() => onSelectLoan(loan.id)}
-                className="w-full flex items-center gap-3 px-4 py-3.5 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors text-left">
-                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${chipCls}`}>L-{String(loans.length - i).padStart(2,'0')}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="font-mono font-semibold text-sm text-gray-800">{fmtINR(loan.principal)}</div>
-                  <div className="text-xs text-gray-400">{fmtDate(loan.date)} · {loan.rate}% p.m. · {loan.months} months</div>
-                </div>
-                <div className="text-right">
-                  {snap.isClosed
-                    ? <span className="text-xs text-green-600 font-medium">Paid ✓</span>
-                    : <span className="text-sm font-mono font-semibold text-red-700">{fmtINR(snap.pending)}</span>
-                  }
-                  <div className="text-xs text-gray-400">
-                    {snap.isClosed ? 'completely' : 'pending'}
-                  </div>
-                </div>
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#BDBDBD" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-              </button>
-            )
-          })
-        )}
-      </div>
+        </div>
+      ) : (
+        <>
+          {/* Active Loans Section */}
+          {activeLoans.length > 0 && (
+            <>
+              <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-1 mb-2">Active Loans</div>
+              <div className="bg-white rounded-lg elev-1 overflow-hidden mb-4">
+                {activeLoans.map(({ loan, snap, displayId }) => {
+                  const chipCls = snap.isOverdue ? 'bg-red-100 text-red-700' : 'bg-blue-50 text-primary-600'
+                  return (
+                    <button key={loan.id} onClick={() => onSelectLoan(loan.id)}
+                      className="w-full flex items-center gap-3 px-4 py-3.5 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors text-left">
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${chipCls}`}>{displayId}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-mono font-semibold text-sm text-gray-800">{fmtINR(loan.principal)}</div>
+                        <div className="text-xs text-gray-400">{fmtDate(loan.date)} · {loan.rate}% p.m. · {loan.months} months</div>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-sm font-mono font-semibold text-red-700">{fmtINR(snap.pending)}</span>
+                        <div className="text-xs text-gray-400">pending</div>
+                      </div>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#BDBDBD" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                    </button>
+                  )
+                })}
+              </div>
+            </>
+          )}
+
+          {/* Completed Loans Section */}
+          {completedLoans.length > 0 && (
+            <>
+              <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-1 mb-2 mt-2">Completed Loans</div>
+              <div className="bg-white rounded-lg elev-1 overflow-hidden mb-3">
+                {completedLoans.map(({ loan, snap, displayId }) => (
+                  <button key={loan.id} onClick={() => onSelectLoan(loan.id)}
+                    className="w-full flex items-center gap-3 px-4 py-3.5 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors text-left opacity-80">
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 bg-gray-100 text-gray-400">{displayId}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-mono font-semibold text-sm text-gray-600">{fmtINR(loan.principal)}</div>
+                      <div className="text-xs text-gray-400">{fmtDate(loan.date)} · {loan.rate}% p.m. · {loan.months} months</div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs text-green-600 font-medium">Paid ✓</span>
+                      <div className="text-xs text-gray-400">completely</div>
+                    </div>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#BDBDBD" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </>
+      )}
 
       {/* Add loan */}
       {!showAdd ? (

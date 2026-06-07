@@ -160,7 +160,7 @@ export interface LoanSnapshot {
 }
 
 export function loanSnapshot(
-  loan:     { principal: number; rate: number; months: number; date: string },
+  loan:     { principal: number; rate: number; months: number; date: string; closed?: boolean },
   payments: { amount: number; date: string }[],
   toDate?:  string
 ): LoanSnapshot {
