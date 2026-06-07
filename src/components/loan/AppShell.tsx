@@ -81,6 +81,7 @@ export default function AppShell() {
         loanId={loanId}
         clientId={clientId}
         isPaid={isPaid}
+        onBack={goBack}
       />
     : <EmptyPanel icon="📋" message="Select a loan to view details" />
 
