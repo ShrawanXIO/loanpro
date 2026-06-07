@@ -76,7 +76,9 @@ export default function LoanDetail({ tenantId, loanId, clientId, isPaid = false,
       `📞 ${client.phone}`,
       ``,
       `💰 Principal: ${fmtINR(loan.principal)}`,
-      `📈 Interest (SI): ${fmtINR(snap.originalSI)}`,
+      `📆 Period: ${loan.months} months`,
+      `📈 Interest (Per Month): ${fmtINR(snap.monthlyInterest)}`,
+      `📊 Total Interest: ${fmtINR(snap.totalInterest)}`,
       snap.overdueSI > 0 ? `⚠ Overdue Interest: ${fmtINR(snap.overdueSI)}` : '',
       `🧾 Total Due: ${fmtINR(snap.totalDue)}`,
       `✅ Total Paid: ${fmtINR(snap.totalPaid)}`,
@@ -86,7 +88,7 @@ export default function LoanDetail({ tenantId, loanId, clientId, isPaid = false,
       `📅 Due Date: ${fmtDate(snap.dueDate)}`,
       snap.isOverdue
         ? `⚠ Overdue by ${snap.overdueDays} days`
-        : `⏳ ${loan.days - snap.elapsed} days remaining`,
+        : `⏳ ${Math.max(0, loan.months - snap.elapsed)} months remaining`,
     ].filter(Boolean).join('\n')
 
     window.open(`https://wa.me/?text=${encodeURIComponent(lines)}`, '_blank')
@@ -119,9 +121,10 @@ export default function LoanDetail({ tenantId, loanId, clientId, isPaid = false,
       <div class="sub">📞 ${client!.phone} &nbsp;·&nbsp; Loan Date: ${fmtDate(loan!.date)}</div>
       <table>
         <tr><td>Principal</td><td>${fmtINR(loan!.principal)}</td></tr>
-        <tr><td>Rate · Period</td><td>${loan!.rate}% p.a. · ${loan!.days} days</td></tr>
+        <tr><td>Rate · Period</td><td>${loan!.rate}% p.m. · ${loan!.months} months</td></tr>
         <tr><td>Due Date</td><td>${fmtDate(snap!.dueDate)}</td></tr>
-        <tr><td>Original Interest (SI)</td><td>${fmtINR(snap!.originalSI)}</td></tr>
+        <tr><td>Interest (Per Month)</td><td>${fmtINR(snap!.monthlyInterest)}</td></tr>
+        <tr><td>Total Interest (${loan!.months} months)</td><td>${fmtINR(snap!.totalInterest)}</td></tr>
         ${snap!.overdueSI > 0
           ? `<tr class="overdue"><td>Overdue Interest (${snap!.overdueDays} days)</td><td>${fmtINR(snap!.overdueSI)}</td></tr>`
           : ''}
@@ -141,8 +144,6 @@ export default function LoanDetail({ tenantId, loanId, clientId, isPaid = false,
     `
 
     // Inject a temporary full-page print div into the current document.
-    // @media print CSS hides everything else and shows only this div.
-    // After printing, the div is removed — user stays on the same screen.
     const printDiv = document.createElement('div')
     printDiv.id = '__loanpro_print__'
     printDiv.innerHTML = `
@@ -160,11 +161,10 @@ export default function LoanDetail({ tenantId, loanId, clientId, isPaid = false,
     `
     document.body.appendChild(printDiv)
 
-    // Trigger native print dialog — works on iOS Safari, Android Chrome, desktop
-    // After user closes print dialog / taps Cancel, execution resumes here
+    // Trigger native print dialog
     window.print()
 
-    // Clean up — remove the print div, user is back on the loan screen
+    // Clean up
     document.body.removeChild(printDiv)
     setToast({ text: 'Print complete — you\'re back', type: 'success', showBack: false })
   }
@@ -183,7 +183,7 @@ export default function LoanDetail({ tenantId, loanId, clientId, isPaid = false,
   return (
     <div className="max-w-lg mx-auto p-4 space-y-3 pb-10">
 
-      {/* ── TOAST — appears after Share or Print, with optional Go Back ── */}
+      {/* ── TOAST ── */}
       {toast && (
         <div className={`fixed top-16 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl text-white text-sm font-medium ${
           toast.type === 'success' ? 'bg-green-600' : 'bg-blue-600'
@@ -195,7 +195,6 @@ export default function LoanDetail({ tenantId, loanId, clientId, isPaid = false,
             }
             <span>{toast.text}</span>
           </div>
-          {/* Go Back button — only shown after Share or Print */}
           {toast.showBack && onBack && (
             <button
               onClick={() => { setToast(null); onBack() }}
@@ -221,7 +220,7 @@ export default function LoanDetail({ tenantId, loanId, clientId, isPaid = false,
         </div>
       )}
 
-      {/* Share / Print — Pro users, same screen after action */}
+      {/* Share / Print */}
       {isPaid && (
         <div className="flex gap-2">
           <button onClick={handleShare}
@@ -245,9 +244,10 @@ export default function LoanDetail({ tenantId, loanId, clientId, isPaid = false,
         </div>
         {[
           { label: 'Principal',              value: fmtINR(loan.principal),  cls: '' },
-          { label: 'Original Interest (SI)', value: fmtINR(snap.originalSI), cls: '' },
+          { label: 'Interest (Per Month)',   value: fmtINR(snap.monthlyInterest), cls: 'text-gray-600' },
+          { label: `Total Interest (${loan.months} months)`, value: fmtINR(snap.totalInterest), cls: '' },
           ...(snap.overdueSI > 0 ? [{ label: `Overdue Interest (${snap.overdueDays}d)`, value: fmtINR(snap.overdueSI), cls: 'text-amber-600' }] : []),
-          { label: 'Rate · Period', value: `${loan.rate}% p.a. · ${loan.days} days`, cls: 'text-gray-600 text-sm' },
+          { label: 'Rate · Period', value: `${loan.rate}% p.m. · ${loan.months} months`, cls: 'text-gray-600 text-sm' },
         ].map(row => (
           <div key={row.label} className="flex justify-between items-center px-4 py-3 border-b border-gray-100">
             <span className="text-sm text-gray-500">{row.label}</span>
@@ -281,21 +281,21 @@ export default function LoanDetail({ tenantId, loanId, clientId, isPaid = false,
         </div>
         <div>
           <div className="flex justify-between mb-1.5">
-            <span className="text-xs text-gray-400">Days Elapsed</span>
+            <span className="text-xs text-gray-400">Time Elapsed</span>
             <span className="text-xs font-mono font-semibold text-blue-600">{snap.daysPct}%</span>
           </div>
           <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
             <div className={`h-full rounded-full transition-all ${dayBar}`} style={{width:`${Math.min(100,snap.daysPct)}%`}}/>
           </div>
           <div className="flex justify-between mt-1">
-            <span className="text-xs text-gray-400">{snap.elapsed} days elapsed</span>
-            <span className="text-xs text-gray-400">{loan.days} days term</span>
+            <span className="text-xs text-gray-400">{snap.elapsed} months elapsed</span>
+            <span className="text-xs text-gray-400">{loan.months} months term</span>
           </div>
         </div>
         <div className={`text-xs text-right font-medium ${snap.isClosed ? 'text-green-600' : snap.isOverdue ? 'text-red-600' : 'text-gray-400'}`}>
           {snap.isClosed ? '✓ Fully repaid'
             : snap.isOverdue ? `⚠ Overdue by ${snap.overdueDays} days · Due ${fmtDate(snap.dueDate)}`
-            : `${loan.days - snap.elapsed} days remaining · Due ${fmtDate(snap.dueDate)}`}
+            : `${Math.max(0, loan.months - snap.elapsed)} months remaining · Due ${fmtDate(snap.dueDate)}`}
         </div>
       </div>
 

@@ -11,7 +11,7 @@ export default function Dashboard({ tenantId }: { tenantId: string }) {
     getDashboardData(tenantId).then(raw => {
       const { clients, loans, payments } = raw as {
         clients: {id:string;name:string}[];
-        loans: {id:string;clientId:string;principal:number;rate:number;days:number;date:string;closed:boolean}[];
+        loans: {id:string;clientId:string;principal:number;rate:number;months:number;date:string;closed:boolean}[];
         payments: {id:string;loanId:string;amount:number;date:string;mode:string}[]
       }
 
