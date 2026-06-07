@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { isProActive } from '@/lib/firestore'
 import { Menu, X, Settings, Users, LayoutDashboard, LogOut, ChevronLeft } from 'lucide-react'
+import { Logo } from '@/lib/logo'
 import ClientList from './ClientList'
 import ClientDetail from './ClientDetail'
 import LoanDetail from './LoanDetail'
@@ -81,6 +82,7 @@ export default function AppShell() {
         loanId={loanId}
         clientId={clientId}
         isPaid={isPaid}
+        onBack={goBack}
       />
     : <EmptyPanel icon="📋" message="Select a loan to view details" />
 
@@ -100,9 +102,7 @@ export default function AppShell() {
           <div className="flex items-center gap-3 px-6 py-3 border-b border-blue-600/50">
             {tenant.logoUrl
               ? <img src={tenant.logoUrl} alt="logo" className="h-10 w-10 rounded-lg object-contain bg-white/10 p-0.5"/>
-              : <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center text-base font-bold">
-                  {tenant.businessName.slice(0,2).toUpperCase()}
-                </div>
+              : <Logo size={40} />
             }
             <div>
               <div className="font-bold text-lg leading-tight">{tenant.businessName}</div>
@@ -179,9 +179,7 @@ export default function AppShell() {
           <div className="flex items-center gap-2 flex-1 min-w-0">
             {tenant.logoUrl
               ? <img src={tenant.logoUrl} alt="" className="h-7 w-7 rounded object-contain bg-white/10"/>
-              : <div className="w-7 h-7 rounded bg-white/20 flex items-center justify-center text-xs font-bold">
-                  {tenant.businessName.slice(0,2).toUpperCase()}
-                </div>
+              : <Logo size={28} />
             }
             <span className="font-semibold text-sm truncate">{tenant.businessName}</span>
           </div>
@@ -199,9 +197,7 @@ export default function AppShell() {
               <div className="bg-blue-700 text-white p-5 pt-6">
                 {tenant.logoUrl
                   ? <img src={tenant.logoUrl} alt="" className="h-12 w-12 rounded-lg mb-3 object-contain bg-white/20"/>
-                  : <div className="w-12 h-12 rounded-lg bg-white/20 flex items-center justify-center text-xl font-bold mb-3">
-                      {tenant.businessName.slice(0,2).toUpperCase()}
-                    </div>
+                  : <div className="mb-3"><Logo size={48} /></div>
                 }
                 <div className="font-bold text-base truncate">{tenant.businessName}</div>
                 <div className="text-blue-200 text-xs mt-0.5">{user.email}</div>

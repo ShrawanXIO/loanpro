@@ -1,6 +1,6 @@
-// src/app/page.tsx — Marketing / landing page
-// Price always comes from config — never hardcoded
+// src/app/page.tsx — Landing page
 import Link from 'next/link'
+import { Logo } from '@/lib/logo'
 import config from '@/lib/config'
 
 export default function Home() {
@@ -13,10 +13,10 @@ export default function Home() {
       {/* Hero */}
       <div className="bg-blue-700 text-white">
         <div className="max-w-4xl mx-auto px-6 py-16 text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/20 mb-6">
-            <span className="text-2xl font-bold">LM</span>
+          <div className="flex justify-center mb-6">
+            <Logo size={72} />
           </div>
-          <h1 className="text-4xl font-bold mb-4">{config.appName}</h1>
+          <h1 className="text-4xl font-bold mb-4">LoanPro</h1>
           <p className="text-xl text-blue-100 mb-8 max-w-xl mx-auto">
             Track loans, collect payments, grow your lending business — from your phone.
           </p>
@@ -54,13 +54,12 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Pricing — price from config */}
+      {/* Pricing */}
       <div className="bg-gray-50 py-16">
         <div className="max-w-3xl mx-auto px-6">
           <h2 className="text-2xl font-bold text-center mb-12 text-gray-800">Simple Pricing</h2>
           <div className="grid md:grid-cols-2 gap-6">
 
-            {/* Free */}
             <div className="bg-white rounded-xl p-8 shadow-sm">
               <div className="text-sm font-semibold text-blue-600 uppercase tracking-wide mb-2">Free Forever</div>
               <div className="text-3xl font-bold mb-1">₹0</div>
@@ -83,7 +82,6 @@ export default function Home() {
               </Link>
             </div>
 
-            {/* Pro — price from config */}
             <div className="bg-blue-700 text-white rounded-xl p-8 shadow-md">
               <div className="text-sm font-semibold text-blue-200 uppercase tracking-wide mb-2">Pro</div>
               <div className="text-3xl font-bold mb-1">{priceStr}</div>
@@ -112,7 +110,7 @@ export default function Home() {
       </div>
 
       <footer className="text-center py-8 text-gray-400 text-sm">
-        © {new Date().getFullYear()} {config.appName} · Built for Indian lenders
+        © {new Date().getFullYear()} LoanPro · Built for Indian lenders
       </footer>
     </main>
   )

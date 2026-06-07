@@ -1,21 +1,24 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-import { AlertTriangle, Share2, Printer } from 'lucide-react'
+import { AlertTriangle, Share2, Printer, Check, ArrowLeft } from 'lucide-react'
 import { getLoans, getClients, getPayments, addPayment } from '@/lib/firestore'
-import { loanSnapshot, fmtINR, fmtDate, LoanSnapshot, Loan, Payment } from '@/lib/finance'
+import { loanSnapshot, fmtINR, fmtDate, LoanSnapshot } from '@/lib/finance'
+import type { Loan, Payment } from '@/lib/finance'
 import config from '@/lib/config'
 
-// Re-export types locally for clarity
 type Client = { id: string; name: string; phone: string }
 
 interface Props {
   tenantId: string
   loanId:   string
   clientId: string
-  isPaid?:  boolean   // passed from AppShell based on isProActive()
+  isPaid?:  boolean
+  onBack?:  () => void   // called when user taps Go Back in toast
 }
 
-export default function LoanDetail({ tenantId, loanId, clientId, isPaid = false }: Props) {
+type ToastMsg = { text: string; type: 'success' | 'info'; showBack: boolean } | null
+
+export default function LoanDetail({ tenantId, loanId, clientId, isPaid = false, onBack }: Props) {
   const [loan,     setLoan]     = useState<Loan | null>(null)
   const [client,   setClient]   = useState<Client | null>(null)
   const [payments, setPayments] = useState<Payment[]>([])
@@ -25,6 +28,7 @@ export default function LoanDetail({ tenantId, loanId, clientId, isPaid = false 
   const [payMode,  setPayMode]  = useState('Cash')
   const [saving,   setSaving]   = useState(false)
   const [err,      setErr]      = useState('')
+  const [toast,    setToast]    = useState<ToastMsg>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -42,16 +46,29 @@ export default function LoanDetail({ tenantId, loanId, clientId, isPaid = false 
 
   useEffect(() => { load() }, [load])
 
+  // Auto-hide toast after 6 seconds (longer so user can tap Go Back)
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => setToast(null), 6000)
+    return () => clearTimeout(t)
+  }, [toast])
+
   async function handlePayment() {
     const amt = parseFloat(payAmt)
     if (!amt || amt <= 0) { setErr('Enter a valid amount'); return }
     setSaving(true); setErr('')
-    try { await addPayment(tenantId, loanId, amt, payMode); setPayAmt(''); await load() }
-    catch  { setErr('Failed to record payment. Try again.') }
+    try {
+      await addPayment(tenantId, loanId, amt, payMode)
+      setPayAmt('')
+      await load()
+      // Payment toast — no back button needed
+      setToast({ text: `Payment of ${fmtINR(amt)} recorded`, type: 'success', showBack: false })
+    } catch {
+      setErr('Failed to record payment. Try again.')
+    }
     setSaving(false)
   }
 
-  // WhatsApp share — Pro only
   function handleShare() {
     if (!loan || !snap || !client) return
     const lines = [
@@ -71,47 +88,85 @@ export default function LoanDetail({ tenantId, loanId, clientId, isPaid = false 
         ? `⚠ Overdue by ${snap.overdueDays} days`
         : `⏳ ${loan.days - snap.elapsed} days remaining`,
     ].filter(Boolean).join('\n')
+
     window.open(`https://wa.me/?text=${encodeURIComponent(lines)}`, '_blank')
+    // Show toast WITH Go Back button after share
+    setToast({ text: 'Opened WhatsApp', type: 'info', showBack: true })
   }
 
-  // Print — Pro only
   function handlePrint() {
     if (!loan || !snap || !client) return
-    const html = `<html><head><title>Loan Summary</title>
-    <style>
-      body{font-family:Arial,sans-serif;padding:32px;color:#212121}
-      h1{color:#1565C0;margin-bottom:4px} .sub{color:#757575;margin-bottom:24px}
-      table{width:100%;border-collapse:collapse;margin-bottom:24px}
-      td{padding:10px 12px;border-bottom:1px solid #E0E0E0}
-      td:first-child{color:#757575} td:last-child{font-weight:600;text-align:right;font-family:monospace}
-      .total td{background:#E3F2FD;font-weight:700;font-size:1.1em}
-      .overdue td{background:#FFEBEE;color:#C62828}
-      h2{margin-top:24px;margin-bottom:8px;color:#424242;font-size:14px}
-      .pr{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0f0f0}
-      .footer{margin-top:32px;color:#9E9E9E;font-size:12px;text-align:center}
-    </style></head><body>
-    <h1>${client.name}</h1>
-    <div class="sub">📞 ${client.phone} · Loan Date: ${fmtDate(loan.date)}</div>
-    <table>
-      <tr><td>Principal</td><td>${fmtINR(loan.principal)}</td></tr>
-      <tr><td>Rate · Period</td><td>${loan.rate}% p.a. · ${loan.days} days</td></tr>
-      <tr><td>Due Date</td><td>${fmtDate(snap.dueDate)}</td></tr>
-      <tr><td>Original Interest (SI)</td><td>${fmtINR(snap.originalSI)}</td></tr>
-      ${snap.overdueSI > 0 ? `<tr class="overdue"><td>Overdue Interest (${snap.overdueDays} days)</td><td>${fmtINR(snap.overdueSI)}</td></tr>` : ''}
-      <tr class="total"><td>Total Due</td><td>${fmtINR(snap.totalDue)}</td></tr>
-      <tr><td>Total Paid</td><td>${fmtINR(snap.totalPaid)}</td></tr>
-      <tr><td>Pending</td><td>${fmtINR(snap.pending)}</td></tr>
-    </table>
-    <h2>Payment History</h2>
-    ${payments.length === 0
-      ? '<p style="color:#9E9E9E">No payments recorded</p>'
-      : [...payments].sort((a,b) => a.date < b.date ? -1 : 1)
-          .map(p => `<div class="pr"><span>${fmtDate(p.date)} — ${p.mode}</span><span>${fmtINR(p.amount)}</span></div>`).join('')
-    }
-    <div class="footer">Generated by ${config.appName} · ${new Date().toLocaleDateString('en-IN')}</div>
-    </body></html>`
-    const w = window.open('', '_blank')
-    if (w) { w.document.write(html); w.document.close(); w.print() }
+
+    // Build printable HTML string
+    const printStyles = `
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: Arial, sans-serif; padding: 24px; color: #212121; }
+      h1 { color: #1565C0; margin-bottom: 4px; font-size: 20px; }
+      .sub { color: #757575; margin-bottom: 20px; font-size: 13px; }
+      table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+      td { padding: 9px 10px; border-bottom: 1px solid #E0E0E0; font-size: 13px; }
+      td:first-child { color: #757575; }
+      td:last-child { font-weight: 600; text-align: right; font-family: monospace; }
+      .total td { background: #E3F2FD; font-weight: 700; font-size: 15px; }
+      .overdue td { background: #FFEBEE; color: #C62828; }
+      h2 { margin-top: 20px; margin-bottom: 8px; color: #424242; font-size: 13px; font-weight: 600; }
+      .pr { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
+      .footer { margin-top: 28px; color: #9E9E9E; font-size: 11px; text-align: center; }
+    `
+
+    const printBody = `
+      <h1>${client!.name}</h1>
+      <div class="sub">📞 ${client!.phone} &nbsp;·&nbsp; Loan Date: ${fmtDate(loan!.date)}</div>
+      <table>
+        <tr><td>Principal</td><td>${fmtINR(loan!.principal)}</td></tr>
+        <tr><td>Rate · Period</td><td>${loan!.rate}% p.a. · ${loan!.days} days</td></tr>
+        <tr><td>Due Date</td><td>${fmtDate(snap!.dueDate)}</td></tr>
+        <tr><td>Original Interest (SI)</td><td>${fmtINR(snap!.originalSI)}</td></tr>
+        ${snap!.overdueSI > 0
+          ? `<tr class="overdue"><td>Overdue Interest (${snap!.overdueDays} days)</td><td>${fmtINR(snap!.overdueSI)}</td></tr>`
+          : ''}
+        <tr class="total"><td>Total Due</td><td>${fmtINR(snap!.totalDue)}</td></tr>
+        <tr><td>Total Paid</td><td>${fmtINR(snap!.totalPaid)}</td></tr>
+        <tr><td>Pending</td><td>${fmtINR(snap!.pending)}</td></tr>
+      </table>
+      <h2>Payment History</h2>
+      ${payments.length === 0
+        ? '<p style="color:#9E9E9E;font-size:13px">No payments recorded</p>'
+        : [...payments]
+            .sort((a, b) => (a.date < b.date ? -1 : 1))
+            .map(p => `<div class="pr"><span>${fmtDate(p.date)} — ${p.mode}</span><span>${fmtINR(p.amount)}</span></div>`)
+            .join('')
+      }
+      <div class="footer">Generated by ${config.appName} · ${new Date().toLocaleDateString('en-IN')}</div>
+    `
+
+    // Inject a temporary full-page print div into the current document.
+    // @media print CSS hides everything else and shows only this div.
+    // After printing, the div is removed — user stays on the same screen.
+    const printDiv = document.createElement('div')
+    printDiv.id = '__loanpro_print__'
+    printDiv.innerHTML = `
+      <style>
+        ${printStyles}
+        @media print {
+          body > *:not(#__loanpro_print__) { display: none !important; }
+          #__loanpro_print__ { display: block !important; }
+        }
+        @media screen {
+          #__loanpro_print__ { display: none; }
+        }
+      </style>
+      ${printBody}
+    `
+    document.body.appendChild(printDiv)
+
+    // Trigger native print dialog — works on iOS Safari, Android Chrome, desktop
+    // After user closes print dialog / taps Cancel, execution resumes here
+    window.print()
+
+    // Clean up — remove the print div, user is back on the loan screen
+    document.body.removeChild(printDiv)
+    setToast({ text: 'Print complete — you\'re back', type: 'success', showBack: false })
   }
 
   if (loading || !loan || !snap) return (
@@ -128,12 +183,37 @@ export default function LoanDetail({ tenantId, loanId, clientId, isPaid = false 
   return (
     <div className="max-w-lg mx-auto p-4 space-y-3 pb-10">
 
+      {/* ── TOAST — appears after Share or Print, with optional Go Back ── */}
+      {toast && (
+        <div className={`fixed top-16 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl text-white text-sm font-medium ${
+          toast.type === 'success' ? 'bg-green-600' : 'bg-blue-600'
+        }`} style={{ minWidth: 240, maxWidth: 340 }}>
+          <div className="flex items-center gap-2 flex-1">
+            {toast.type === 'success'
+              ? <Check size={16} className="flex-shrink-0"/>
+              : <Share2 size={16} className="flex-shrink-0"/>
+            }
+            <span>{toast.text}</span>
+          </div>
+          {/* Go Back button — only shown after Share or Print */}
+          {toast.showBack && onBack && (
+            <button
+              onClick={() => { setToast(null); onBack() }}
+              className="flex items-center gap-1 bg-white/20 hover:bg-white/30 rounded-lg px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap transition-colors">
+              <ArrowLeft size={13}/> Go Back
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Overdue banner */}
       {snap.isOverdue && (
         <div className="bg-red-50 border-l-4 border-red-600 rounded-r-lg p-4 flex gap-3">
           <AlertTriangle size={20} className="text-red-600 flex-shrink-0 mt-0.5"/>
           <div>
-            <div className="font-semibold text-red-700">Overdue by {snap.overdueDays} day{snap.overdueDays > 1 ? 's' : ''}</div>
+            <div className="font-semibold text-red-700">
+              Overdue by {snap.overdueDays} day{snap.overdueDays > 1 ? 's' : ''}
+            </div>
             <div className="text-red-600 text-sm mt-0.5">
               Extra interest: {fmtINR(snap.overdueSI)} on outstanding {fmtINR(snap.outstandingPrincipal)}
             </div>
@@ -141,15 +221,15 @@ export default function LoanDetail({ tenantId, loanId, clientId, isPaid = false 
         </div>
       )}
 
-      {/* Share / Print — Pro users see buttons, free users see nothing here */}
+      {/* Share / Print — Pro users, same screen after action */}
       {isPaid && (
         <div className="flex gap-2">
           <button onClick={handleShare}
-            className="flex-1 flex items-center justify-center gap-2 bg-green-500 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-green-600 transition-colors">
+            className="flex-1 flex items-center justify-center gap-2 bg-green-500 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-green-600 active:bg-green-700 transition-colors">
             <Share2 size={16}/> Share via WhatsApp
           </button>
           <button onClick={handlePrint}
-            className="flex-1 flex items-center justify-center gap-2 bg-gray-700 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-gray-800 transition-colors">
+            className="flex-1 flex items-center justify-center gap-2 bg-gray-700 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-gray-800 active:bg-gray-900 transition-colors">
             <Printer size={16}/> Print Summary
           </button>
         </div>
@@ -167,7 +247,7 @@ export default function LoanDetail({ tenantId, loanId, clientId, isPaid = false 
           { label: 'Principal',              value: fmtINR(loan.principal),  cls: '' },
           { label: 'Original Interest (SI)', value: fmtINR(snap.originalSI), cls: '' },
           ...(snap.overdueSI > 0 ? [{ label: `Overdue Interest (${snap.overdueDays}d)`, value: fmtINR(snap.overdueSI), cls: 'text-amber-600' }] : []),
-          { label: 'Rate · Period',          value: `${loan.rate}% p.a. · ${loan.days} days`, cls: 'text-sm text-gray-600' },
+          { label: 'Rate · Period', value: `${loan.rate}% p.a. · ${loan.days} days`, cls: 'text-gray-600 text-sm' },
         ].map(row => (
           <div key={row.label} className="flex justify-between items-center px-4 py-3 border-b border-gray-100">
             <span className="text-sm text-gray-500">{row.label}</span>
@@ -220,7 +300,9 @@ export default function LoanDetail({ tenantId, loanId, clientId, isPaid = false 
       </div>
 
       {/* Payment history */}
-      <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-1">Payment History</div>
+      <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-1">
+        Payment History
+      </div>
       <div className="bg-white rounded-lg shadow-sm overflow-hidden">
         {payments.length === 0
           ? <div className="text-center py-8 text-gray-400 text-sm">No payments yet</div>
@@ -237,7 +319,7 @@ export default function LoanDetail({ tenantId, loanId, clientId, isPaid = false 
         }
       </div>
 
-      {/* Record payment — hidden if loan is closed */}
+      {/* Record payment */}
       {!snap.isClosed && (
         <div className="bg-white rounded-lg shadow-sm p-4">
           <div className="text-sm font-semibold text-gray-700 mb-3">Record Payment</div>
